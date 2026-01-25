@@ -10,6 +10,7 @@ dependencies = [
     "openai>=2.15.0",
     "pandas>=2.3.3",
     "pypdf2>=3.0.1",
+    "pytest>=8.4.2",
     "sentence-transformers>=5.1.2",
     "tqdm>=4.67.1",
 ]
