@@ -3,6 +3,7 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from condo_rag.ingest import chunk_text
+from condo_rag.qa import retrieve_semantic_search
 MODEL_ALL_MINILM_L6_V2_NAME = 'sentence-transformers/all-MiniLM-L6-v2'
 
 @pytest.fixture
@@ -59,7 +60,6 @@ def doc2_dct(doc2_text):
     dct = {'source': "doc2_text", 'text': doc2_text}
     return dct
 
-
 @pytest.fixture
 def doc1_embeddings(doc1_dct):
     model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
@@ -102,6 +102,38 @@ def indexA(doc1_embeddings, doc2_embeddings):
     index.add(embs)
     return index
 
+@pytest.fixture
+def metadatasA_bigchunk(doc1_dct, doc2_dct):
+    """
+    Large chunk size.  Basically will be one chunk per document.
+    """
+    CHUNKSIZE = 1000
+    OVERLAP = 200
+    metadata_lst = []
+    chunks1 = chunk_text(doc1_dct['text'], chunk_size = CHUNKSIZE, overlap=OVERLAP)
+    for i, c in enumerate(chunks1):
+        metadata_lst.append({"source": doc1_dct.get('source'), "chunk": i})
+    chunks2 = chunk_text(doc2_dct['text'], chunk_size = CHUNKSIZE, overlap=OVERLAP)
+    for i, c in enumerate(chunks2):
+        metadata_lst.append({"source": doc2_dct.get('source'), "chunk": i})
+    return metadata_lst
+
+@pytest.fixture
+def metadatasA_smallchunk(doc1_dct, doc2_dct):
+    """
+    Small chunk size.  Will be many chunks per document.
+    """
+    CHUNKSIZE = 20
+    OVERLAP = 0
+    metadata_lst = []
+    chunks1 = chunk_text(doc1_dct['text'], chunk_size = CHUNKSIZE, overlap=OVERLAP)
+    for i, c in enumerate(chunks1):
+        metadata_lst.append({"source": doc1_dct.get('source'), "chunk": i})
+    chunks2 = chunk_text(doc2_dct['text'], chunk_size = CHUNKSIZE, overlap=OVERLAP)
+    for i, c in enumerate(chunks2):
+        metadata_lst.append({"source": doc2_dct.get('source'), "chunk": i})
+    return metadata_lst
+
 class Test_trivial:
     def test_trivial_1(self):
         assert True
@@ -128,3 +160,30 @@ class Test_fixtures:
 class Test_retrieve_semantic_search:
     def test_1(self, indexA):
         assert indexA is not None
+
+    def test_query_gettysburg_top_ranked_1(self, indexA, metadatasA_bigchunk):
+        """
+        Using indexA and medatatasA, ask a question which is clearly best
+        answered with document1. Expect top result from retrieve_semantic_search()
+        to be from source = "doc1_text"; chunk = 0, 
+        and 2nd result to be from source. = "doc2_text", chunk = 0
+        """
+        model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
+        query = "when did our fathers bring forth a new nation?"
+        results = retrieve_semantic_search(query, model, indexA, metadatasA_bigchunk, k_top=5)
+        # Assert top result corresponds to doc1 (high score for doc1_embeddings)
+        assert results[0]['metadata']['source'] == "doc1_text"
+        assert results[1]['metadata']['source'] == "doc2_text"
+
+    def test_query_gettysburg_top_ranked_2(self, indexA, metadatasA_smallchunk):
+        """
+        Using indexA and medatatasA, ask a question which is clearly best
+        answered with document1. Expect top result from retrieve_semantic_search()
+        to be from source = "doc1_text"; chunk = 0, 
+        
+        """
+        model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
+        query = "when did our fathers bring forth a new nation?"
+        results = retrieve_semantic_search(query, model, indexA, metadatasA_smallchunk, k_top=5)
+        # Assert top result corresponds to doc1 (high score for doc1_embeddings)
+        assert results[0]['metadata']['source'] == "doc1_text"
