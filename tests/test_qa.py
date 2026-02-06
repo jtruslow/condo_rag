@@ -91,7 +91,7 @@ def doc2_embeddings(doc2_dct):
     return embedding_lst
 
 @pytest.fixture
-def indexA(doc1_embeddings, doc2_embeddings):
+def indexA_bigchunk(doc1_embeddings, doc2_embeddings):
 
     # Stack embeddings from both documents into a single matrix
     embs = np.vstack([doc1_embeddings, doc2_embeddings])
@@ -100,6 +100,29 @@ def indexA(doc1_embeddings, doc2_embeddings):
     dim = embs.shape[1]
     index = faiss.IndexFlatIP(dim)
     index.add(embs)
+    return index
+
+@pytest.fixture
+def indexA_smallchunk(doc1_dct, doc2_dct):
+    """
+    Small chunk size.  Will be many chunks per document.
+    """
+    CHUNKSIZE = 20
+    OVERLAP = 0
+    texts = []
+
+    model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
+
+    for d in [doc1_dct, doc2_dct]:
+        chunks = chunk_text(d['text'], chunk_size=CHUNKSIZE, overlap=OVERLAP)
+        for c in chunks:
+            texts.append(c)
+
+    embeddings = model.encode(texts, show_progress_bar=True, convert_to_numpy=True, normalize_embeddings=True)
+    dim = embeddings.shape[1]
+    index = faiss.IndexFlatIP(dim)
+    index.add(embeddings)
+
     return index
 
 @pytest.fixture
@@ -151,39 +174,45 @@ class Test_fixtures:
         """
         assert len(doc2_embeddings) > 0
 
-    def test_indexA_1(self, indexA):
+    def test_indexA_1(self, indexA_bigchunk):
         """
-        Expect indexA to be not None
+        Expect indexA_bigchunk to be not None
         """
-        assert indexA.d > 0
+        assert indexA_bigchunk.d > 0
 
 class Test_retrieve_semantic_search:
-    def test_1(self, indexA):
-        assert indexA is not None
+    def test_1(self, indexA_bigchunk):
+        assert indexA_bigchunk is not None
 
-    def test_query_gettysburg_top_ranked_1(self, indexA, metadatasA_bigchunk):
+    def test_query_gettysburg_top_ranked_1(self, indexA_bigchunk, metadatasA_bigchunk):
         """
-        Using indexA and medatatasA, ask a question which is clearly best
+        Using indexA_bigchunk and medatatasA, ask a question which is clearly best
         answered with document1. Expect top result from retrieve_semantic_search()
         to be from source = "doc1_text"; chunk = 0, 
         and 2nd result to be from source. = "doc2_text", chunk = 0
         """
         model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
         query = "when did our fathers bring forth a new nation?"
-        results = retrieve_semantic_search(query, model, indexA, metadatasA_bigchunk, k_top=5)
+        results = retrieve_semantic_search(query, model, indexA_bigchunk, metadatasA_bigchunk, k_top=5)
         # Assert top result corresponds to doc1 (high score for doc1_embeddings)
         assert results[0]['metadata']['source'] == "doc1_text"
         assert results[1]['metadata']['source'] == "doc2_text"
 
-    def test_query_gettysburg_top_ranked_2(self, indexA, metadatasA_smallchunk):
+    def test_query_gettysburg_top_ranked_2(self, indexA_smallchunk, metadatasA_smallchunk):
         """
-        Using indexA and medatatasA, ask a question which is clearly best
+        Using indexA_bigchunk and medatatasA, ask a question which is clearly best
         answered with document1. Expect top result from retrieve_semantic_search()
-        to be from source = "doc1_text"; chunk = 0, 
-        
+        to be from source = "doc1_text"; chunk = 0.
+        Expect top five results to be from doc1_text
         """
         model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
         query = "when did our fathers bring forth a new nation?"
-        results = retrieve_semantic_search(query, model, indexA, metadatasA_smallchunk, k_top=5)
+        results = retrieve_semantic_search(query, model, indexA_smallchunk, metadatasA_smallchunk, k_top=5)
         # Assert top result corresponds to doc1 (high score for doc1_embeddings)
+        assert results[0]['metadata']['chunk'] == 0
         assert results[0]['metadata']['source'] == "doc1_text"
+        assert results[1]['metadata']['source'] == "doc1_text"
+        assert results[2]['metadata']['source'] == "doc1_text"
+        assert results[3]['metadata']['source'] == "doc1_text"
+        assert results[4]['metadata']['source'] == "doc1_text"
+        assert False
