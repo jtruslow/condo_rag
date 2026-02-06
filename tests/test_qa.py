@@ -200,19 +200,58 @@ class Test_retrieve_semantic_search:
 
     def test_query_gettysburg_top_ranked_2(self, indexA_smallchunk, metadatasA_smallchunk):
         """
-        Using indexA_bigchunk and medatatasA, ask a question which is clearly best
+        Using indexA_smallchunk and medatatasA, ask a question which is clearly best
         answered with document1. Expect top result from retrieve_semantic_search()
         to be from source = "doc1_text"; chunk = 0.
-        Expect top five results to be from doc1_text
+        Expect all top five results to be from doc1_text
         """
         model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
         query = "when did our fathers bring forth a new nation?"
         results = retrieve_semantic_search(query, model, indexA_smallchunk, metadatasA_smallchunk, k_top=5)
-        # Assert top result corresponds to doc1 (high score for doc1_embeddings)
+        # Assert top result corresponds to doc1 chunk 0 (high score for doc1_embeddings)
         assert results[0]['metadata']['chunk'] == 0
+
+        # Assert top result corresponds to doc1
         assert results[0]['metadata']['source'] == "doc1_text"
         assert results[1]['metadata']['source'] == "doc1_text"
         assert results[2]['metadata']['source'] == "doc1_text"
         assert results[3]['metadata']['source'] == "doc1_text"
         assert results[4]['metadata']['source'] == "doc1_text"
-        assert False
+
+    def test_query_pride_and_prejudice_1(self, indexA_bigchunk, metadatasA_bigchunk):
+        """
+        Using indexA_bigchunk and metadatasA_bigchunk, ask a question which is clearly best
+        answered with the final sentence of document2. Expect top result from retrieve_semantic_search()
+        to be from source = "doc2_text"; chunk = 0, 
+        and 2nd result to be from source = "doc1_text", chunk = 0
+        """
+        model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
+        query = "What income does this single man collect each year?"
+        results = retrieve_semantic_search(query, model, indexA_bigchunk, metadatasA_bigchunk, k_top=5)
+        # Assert top result corresponds to doc2 (high score for doc2_embeddings)
+        assert results[0]['metadata']['source'] == "doc2_text"
+        assert results[1]['metadata']['source'] == "doc1_text"
+
+    def test_query_pride_and_prejudice_2(self, indexA_smallchunk, metadatasA_smallchunk):
+        """
+        Using indexA_smallchunk and medatatasA, ask a question which is clearly best
+        answered with document2. Expect top result from retrieve_semantic_search()
+        to be from source = "doc2_text"; chunk = 12 or 13 (the last two chunks of doc2_text, which contain the key sentence about the single
+        Expect all top five results to be from doc1_text
+        """
+        model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
+        query = "What income does this single man collect each year from his furtune?"
+        results = retrieve_semantic_search(query, model, indexA_smallchunk, metadatasA_smallchunk, k_top=5)
+        # Assert top result corresponds to doc2 chunk 12 (the second-to-last chunk) or
+        # chunk 13 (last chunk)
+        assert ( 
+            (results[0]['metadata']['chunk'] == 12)
+            or (results[0]['metadata']['chunk'] == 13)
+        )
+
+        # Assert top result corresponds to doc2
+        assert results[0]['metadata']['source'] == "doc2_text"
+        assert results[1]['metadata']['source'] == "doc2_text"
+        assert results[2]['metadata']['source'] == "doc2_text"
+        assert results[3]['metadata']['source'] == "doc2_text"
+        assert results[4]['metadata']['source'] == "doc2_text"
