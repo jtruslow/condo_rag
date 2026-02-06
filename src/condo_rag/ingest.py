@@ -1,0 +1,109 @@
+"""Ingest documents (PDF or text), chunk them, compute embeddings, and store a FAISS index with metadata.
+
+This module provides:
+- load_documents(paths): returns list of {'text':..., 'source':...}
+- chunk_text(text, chunk_size=800, overlap=200)
+- build_index(docs, model_name='sentence-transformers/all-MiniLM-L6-v2') -> (faiss_index, metadatas, embeddings)
+- save_index(index, metadatas, path)
+- load_index(path)
+
+This is intentionally small and synchronous for clarity.
+"""
+from typing import List, Dict, Tuple
+import os
+import io
+from PyPDF2 import PdfReader
+from sentence_transformers import SentenceTransformer
+import numpy as np
+import faiss
+from tqdm import tqdm
+
+
+def load_documents(paths: List[str]) -> List[Dict]:
+    """
+    Load documents from the given file paths and return a list of document dictionaries.
+
+    Parameters
+    - paths (List[str]): A list of filesystem paths to load. Each path may point to a PDF file
+        (ends with .pdf, case-insensitive) or a plain text file.
+
+    Returns
+    - docs: A list of dicts, one per successfully read file, each containing:
+        - 'text' (str): the extracted text content for the document.
+        - 'source' (str): the original file path.
+
+    Behavior
+    - For PDF files, uses PyPDF2.PdfReader to extract text from each page and joins pages with newlines.
+    - For non-PDF files, opens the file as UTF-8 text and reads its full contents.
+    - On any read error the function prints an error message and skips that file.
+    """
+    docs = []
+    for p in paths:
+        if p.lower().endswith('.pdf'):
+            try:
+                reader = PdfReader(p)
+                text = []
+                for page in reader.pages:
+                    text.append(page.extract_text() or "")
+                text = "\n".join(text)
+                docs.append({"text": text, "source": p})
+            except Exception as e:
+                print(f"Failed reading PDF {p}: {e}")
+        else:
+            try:
+                with open(p, 'r', encoding='utf-8') as f:
+                    text = f.read()
+                docs.append({"text": text, "source": p})
+            except Exception as e:
+                print(f"Failed reading text {p}: {e}")
+    return docs
+
+
+def chunk_text(text: str, chunk_size: int = 800, overlap: int = 200) -> List[str]:
+    tokens = text.split()
+    chunks = []
+    start = 0
+    while start < len(tokens):
+        end = min(start + chunk_size, len(tokens))
+        chunk = " ".join(tokens[start:end])
+        chunks.append(chunk)
+        if end == len(tokens):
+            break
+        start = end - overlap
+    return chunks
+
+
+def build_index(docs: List[Dict], model_name: str = 'sentence-transformers/all-MiniLM-L6-v2') -> Tuple[faiss.IndexFlatIP, List[Dict], np.ndarray]:
+    model = SentenceTransformer(model_name)
+    texts = []
+    metadatas = []
+    for d in docs:
+        chunks = chunk_text(d['text'])
+    for i, c in enumerate(chunks):
+        texts.append(c)
+        metadatas.append({"source": d.get('source'), "chunk": i})
+    embeddings = model.encode(texts, show_progress_bar=True, convert_to_numpy=True, normalize_embeddings=True)
+    dim = embeddings.shape[1]
+    index = faiss.IndexFlatIP(dim)
+    index.add(embeddings)
+    return index, metadatas, embeddings, texts
+
+
+def save_index(index, metadatas, path: str):
+    os.makedirs(path, exist_ok=True)
+    faiss.write_index(index, os.path.join(path, 'index.faiss'))
+    import json
+    with open(os.path.join(path, 'metadatas.json'), 'w', encoding='utf-8') as f:
+        json.dump(metadatas, f)
+    with open(os.path.join(path, 'texts.json'), 'w', encoding='utf-8') as f:
+        json.dump(texts, f)
+
+
+def load_index(path: str):
+    import json
+    index = faiss.read_index(os.path.join(path, 'index.faiss'))
+    with open(os.path.join(path, 'metadatas.json'), 'r', encoding='utf-8') as f:
+        metadatas = json.load(f)
+    with open(os.path.join(path, 'texts.json'), 'r', encoding='utf-8') as f:
+        texts = json.load(f)
+    return index, metadatas, texts
