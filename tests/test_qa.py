@@ -3,8 +3,10 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from condo_rag.ingest import chunk_text
-from condo_rag.qa import retrieve_semantic_search
+from condo_rag.qa import retrieve_semantic_search, answer
 MODEL_ALL_MINILM_L6_V2_NAME = 'sentence-transformers/all-MiniLM-L6-v2'
+import os
+from dotenv import load_dotenv
 
 @pytest.fixture
 def doc1_text():
@@ -123,7 +125,7 @@ def indexA_smallchunk(doc1_dct, doc2_dct):
     index = faiss.IndexFlatIP(dim)
     index.add(embeddings)
 
-    return index
+    return {'index': index, 'texts': texts}
 
 @pytest.fixture
 def metadatasA_bigchunk(doc1_dct, doc2_dct):
@@ -200,14 +202,14 @@ class Test_retrieve_semantic_search:
 
     def test_query_gettysburg_top_ranked_2(self, indexA_smallchunk, metadatasA_smallchunk):
         """
-        Using indexA_smallchunk and medatatasA, ask a question which is clearly best
+        Using indexA_smallchunk['index'] and medatatasA, ask a question which is clearly best
         answered with document1. Expect top result from retrieve_semantic_search()
         to be from source = "doc1_text"; chunk = 0.
         Expect all top five results to be from doc1_text
         """
         model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
         query = "when did our fathers bring forth a new nation?"
-        results = retrieve_semantic_search(query, model, indexA_smallchunk, metadatasA_smallchunk, k_top=5)
+        results = retrieve_semantic_search(query, model, indexA_smallchunk['index'], metadatasA_smallchunk, k_top=5)
         # Assert top result corresponds to doc1 chunk 0 (high score for doc1_embeddings)
         assert results[0]['metadata']['chunk'] == 0
 
@@ -234,14 +236,14 @@ class Test_retrieve_semantic_search:
 
     def test_query_pride_and_prejudice_2(self, indexA_smallchunk, metadatasA_smallchunk):
         """
-        Using indexA_smallchunk and medatatasA, ask a question which is clearly best
+        Using indexA_smallchunk['index'] and medatatasA, ask a question which is clearly best
         answered with document2. Expect top result from retrieve_semantic_search()
         to be from source = "doc2_text"; chunk = 12 or 13 (the last two chunks of doc2_text, which contain the key sentence about the single
         Expect all top five results to be from doc1_text
         """
         model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
         query = "What income does this single man collect each year from his furtune?"
-        results = retrieve_semantic_search(query, model, indexA_smallchunk, metadatasA_smallchunk, k_top=5)
+        results = retrieve_semantic_search(query, model, indexA_smallchunk['index'], metadatasA_smallchunk, k_top=5)
         # Assert top result corresponds to doc2 chunk 12 (the second-to-last chunk) or
         # chunk 13 (last chunk)
         assert ( 
@@ -255,3 +257,23 @@ class Test_retrieve_semantic_search:
         assert results[2]['metadata']['source'] == "doc2_text"
         assert results[3]['metadata']['source'] == "doc2_text"
         assert results[4]['metadata']['source'] == "doc2_text"
+
+class Test_answer:
+    def test_gettysburg_answer_1(self, indexA_smallchunk, metadatasA_smallchunk):
+        """
+        Test the answer() function using the setup from test_query_gettysburg_top_ranked_1,
+        but send it indexA_smallchunk, because that's the fixure that also includes attribute 'texts'.
+        Load OpenAI API key via dotenv, query about Gettysburg, and expect the answer to contain
+        a phrase like "four score and seven years ago".
+        """
+        load_dotenv()
+        api_key = os.getenv("OPENAI_API_KEY")
+        assert api_key is not None, "OpenAI API key not found in environment variables"
+
+        model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
+        query = "When did our fathers bring forth a new nation? " + \
+                "Quantify your answer in years"
+        response = answer(query, model, indexA_smallchunk['index'], metadatasA_smallchunk, indexA_smallchunk['texts'], api_key, k_top=5)
+
+        # Assert the answer contains the expected phrase (case-insensitive)
+        assert "87 years" in response

@@ -6,9 +6,13 @@ Functions:
 
 This uses a simple prompt template and OpenAI's text completion API if API key is provided. Otherwise it will return the concatenated context and the query.
 """
+import os
+import faiss
 from typing import List, Dict
 import numpy as np
-import faiss
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env
 
 
 def retrieve_semantic_search(query: str, model, index: faiss.IndexFlatIP, metadatas: List[Dict], k_top: int = 5):
@@ -40,7 +44,7 @@ def retrieve_semantic_search(query: str, model, index: faiss.IndexFlatIP, metada
     return results
 
 
-def answer(query: str, model, index, metadatas, texts: List[str], openai_api_key: str = None) -> str:
+def answer(query: str, model, index, metadatas, texts: List[str], openai_api_key: str = None, k_top: int = 5) -> str:
     """
     Run a RAG-style question-answer step using a FAISS index and optional OpenAI completion.
 
@@ -63,18 +67,27 @@ def answer(query: str, model, index, metadatas, texts: List[str], openai_api_key
            assembled context and the original query for downstream processing.
     """
     # retrieve top chunks
-    retrieved = retrieve_semantic_search(query, model, index, metadatas, k=5)
+    retrieved = retrieve_semantic_search(query, model, index, metadatas, k_top=5)
     context_parts = []
     for r in retrieved:
         context_parts.append(texts[r['idx']])
     context = "\n---\n".join(context_parts)
     if openai_api_key:
         try:
-            import openai
-            openai.api_key = openai_api_key
-            prompt = f"You are a legal assistant. Use the context to answer the question.\nContext:\n{context}\n\nQuestion: {query}\nAnswer concisely and cite sources by filename and chunk index."
-            resp = openai.Completion.create(engine='text-davinci-003', prompt=prompt, max_tokens=512, temperature=0)
-            return resp.choices[0].text.strip()
+            from openai import OpenAI
+
+            client = OpenAI(
+                # This is the default and can be omitted
+                api_key=openai_api_key,
+            )
+
+            openai_instructions = f"You are a legal assistant. Use the context to answer the question.\nContext:\n{context}\n\nQuestion: {query}\nAnswer concisely and cite sources by filename and chunk index."
+            resp = client.responses.create(
+                model='gpt-5.1',
+                input=context,
+                instructions=openai_instructions
+            )
+            return resp.output[0].content[0].text
         except Exception as e:
             return f"OpenAI call failed: {e}\n\nContext:\n{context}"
     else:
