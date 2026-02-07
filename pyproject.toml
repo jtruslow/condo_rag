@@ -12,6 +12,7 @@ dependencies = [
     "pip>=25.3",
     "pypdf2>=3.0.1",
     "pytest>=8.4.2",
+    "python-dotenv>=1.2.1",
     "sentence-transformers>=5.1.2",
     "tqdm>=4.67.1",
 ]
