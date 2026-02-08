@@ -307,6 +307,40 @@ class Test_generate_llm_response:
         # Assert the answer contains the expected phrase (case-insensitive)
         assert ("87" in llm_response.lower()) or ("eighty-seven" in llm_response.lower())
 
+    def test_generate_pride_and_prejudice_1(self, indexA_smallchunk, metadatasA_smallchunk):
+        """
+        Separately test generate_llm_response() function
+        Use mockup of results expected from the retrieval stage of test_query_pride_and_prejudice_2,
+        Send indexA_smallchunk to generate_llm_response(), because that's the fixure that also includes attribute 'texts'.
+        Load OpenAI API key via dotenv, query about a fortune, and expect the answer to contain
+        a phrase like "4000 or 5000".  Other numbers will be wrong.
+        """
+        load_dotenv()
+        api_key = os.getenv("OPENAI_API_KEY")
+        assert api_key is not None, "OpenAI API key not found in environment variables"
+
+        model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
+        query = "What annual income does this single man collect each year from his fortune?" + \
+                "Quantify your answer"
+
+        # mock results from retrieval stage
+        # This is the final few sentences of the passage
+        retrieved_chunks = [
+            {'score': 0.999, 'metadata': {'source': 'doc2_text', 'chunk': 12}, 'idx': 19},
+            {'score': 0.999, 'metadata': {'source': 'doc2_text', 'chunk': 13}, 'idx': 20}
+        ]
+        llm_response = generate_llm_response(query, indexA_smallchunk['index'], metadatasA_smallchunk, retrieved_chunks, indexA_smallchunk['texts'], api_key, k_top=5)
+
+        # Assert the answer contains the expected phrase (case-insensitive)
+        assert (
+            ("four thousand" in llm_response.lower())
+            or ("five thousand" in llm_response.lower())
+            or ("4000" in llm_response.lower())
+            or ("5000" in llm_response.lower())
+            or ("4,000" in llm_response.lower())
+            or ("5,000" in llm_response.lower())
+        )
+
 
 class Test_retrieve_and_generate:
     def test_retrieve_and_generate_gettysburg_1(self, indexA_smallchunk, metadatasA_smallchunk):
