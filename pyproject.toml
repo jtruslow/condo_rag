@@ -6,10 +6,13 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "faiss-cpu>=1.13.0",
-    "numpy>=2.0.2",
+    "numpy<2",
     "openai>=2.15.0",
     "pandas>=2.3.3",
+    "pip>=25.3",
     "pypdf2>=3.0.1",
+    "pytest>=8.4.2",
+    "python-dotenv>=1.2.1",
     "sentence-transformers>=5.1.2",
     "tqdm>=4.67.1",
 ]
@@ -18,3 +21,22 @@ dependencies = [
 required-environments = [
 "sys_platform == 'darwin' and platform_machine == 'x86_64'"
 ]
+
+[tool.uv.workspace]
+members = [
+    ".",
+    ".",
+]
+
+[tool.uv.sources]
+condo-rag = { workspace = true, editable = true }
+
+[dependency-groups]
+dev = [
+    "condo-rag",
+    "pytest>=8.4.2",
+]
+
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"

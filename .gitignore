@@ -1,0 +1,11 @@
+# Ignore environment variables
+.env
+
+# Ignore Pages files
+*.pages
+
+# Ignore data files
+*.parquet
+*.csv
+*.json
+*.pkl
