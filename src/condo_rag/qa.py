@@ -43,7 +43,7 @@ def retrieve_semantic_search(query: str, model, index: faiss.IndexFlatIP, metada
         results.append({"score": float(score), "metadata": metadatas[idx], "idx": int(idx)})
     return results
 
-def generate_llm_response(query: str, index, metadatas, retrieved_chunks: List[dict], texts: List[str], openai_api_key: str = None, k_top: int = 5) -> str:
+def generate_llm_response(query: str, index, metadatas, retrieved_chunks: List[dict], texts: List[str], openai_api_key: str = None) -> str:
     """
     Run a RAG-style question-answer step using a FAISS index and optional OpenAI completion.
 
@@ -118,6 +118,6 @@ def retrieve_and_generate(query: str, model, index, metadatas, texts: List[str],
     - llm_response: output from generate_llm_response()
     """
     retrieved_chunks = retrieve_semantic_search(query, model, index, metadatas, k_top)
-    llm_response = generate_llm_response(query, index, metadatas, retrieved_chunks, texts, openai_api_key, k_top)
+    llm_response = generate_llm_response(query, index, metadatas, retrieved_chunks, texts, openai_api_key)
 
     return llm_response

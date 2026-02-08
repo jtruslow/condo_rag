@@ -276,7 +276,7 @@ class Test_generate_llm_response:
                 "Quantify your answer in years"
 
         retrieved_chunks = retrieve_semantic_search(query, model, indexA_smallchunk['index'], metadatasA_smallchunk, k_top=5)                
-        llm_response = generate_llm_response(query, indexA_smallchunk['index'], metadatasA_smallchunk, retrieved_chunks, indexA_smallchunk['texts'], api_key, k_top=5)
+        llm_response = generate_llm_response(query, indexA_smallchunk['index'], metadatasA_smallchunk, retrieved_chunks, indexA_smallchunk['texts'], api_key)
 
 
         # Assert the answer contains the expected phrase (case-insensitive)
@@ -302,7 +302,7 @@ class Test_generate_llm_response:
         retrieved_chunks = [
             {'score': 0.999, 'metadata': {'source': 'doc1_text', 'chunk': 0}, 'idx': 0}
         ]
-        llm_response = generate_llm_response(query, indexA_smallchunk['index'], metadatasA_smallchunk, retrieved_chunks, indexA_smallchunk['texts'], api_key, k_top=5)
+        llm_response = generate_llm_response(query, indexA_smallchunk['index'], metadatasA_smallchunk, retrieved_chunks, indexA_smallchunk['texts'], api_key)
 
         # Assert the answer contains the expected phrase (case-insensitive)
         assert ("87" in llm_response.lower()) or ("eighty-seven" in llm_response.lower())
@@ -329,7 +329,7 @@ class Test_generate_llm_response:
             {'score': 0.999, 'metadata': {'source': 'doc2_text', 'chunk': 12}, 'idx': 19},
             {'score': 0.999, 'metadata': {'source': 'doc2_text', 'chunk': 13}, 'idx': 20}
         ]
-        llm_response = generate_llm_response(query, indexA_smallchunk['index'], metadatasA_smallchunk, retrieved_chunks, indexA_smallchunk['texts'], api_key, k_top=5)
+        llm_response = generate_llm_response(query, indexA_smallchunk['index'], metadatasA_smallchunk, retrieved_chunks, indexA_smallchunk['texts'], api_key)
 
         # Assert the answer contains the expected phrase (case-insensitive)
         assert (
