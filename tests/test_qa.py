@@ -161,6 +161,9 @@ def metadatasA_smallchunk(doc1_dct, doc2_dct):
 
 class Test_trivial:
     def test_trivial_1(self):
+        """
+        Just make sure that pytest is running.  That's it
+        """
         assert True
 
 class Test_fixtures:
@@ -183,9 +186,6 @@ class Test_fixtures:
         assert indexA_bigchunk.d > 0
 
 class Test_retrieve_semantic_search:
-    def test_1(self, indexA_bigchunk):
-        assert indexA_bigchunk is not None
-
     def test_query_gettysburg_top_ranked_1(self, indexA_bigchunk, metadatasA_bigchunk):
         """
         Using indexA_bigchunk and medatatasA, ask a question which is clearly best
