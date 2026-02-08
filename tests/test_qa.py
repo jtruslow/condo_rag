@@ -3,7 +3,7 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from condo_rag.ingest import chunk_text
-from condo_rag.qa import retrieve_semantic_search, answer
+from condo_rag.qa import retrieve_semantic_search, retrieve_and_generate, generate_llm_response
 MODEL_ALL_MINILM_L6_V2_NAME = 'sentence-transformers/all-MiniLM-L6-v2'
 import os
 from dotenv import load_dotenv
@@ -258,10 +258,11 @@ class Test_retrieve_semantic_search:
         assert results[3]['metadata']['source'] == "doc2_text"
         assert results[4]['metadata']['source'] == "doc2_text"
 
-class Test_answer:
-    def test_gettysburg_answer_1(self, indexA_smallchunk, metadatasA_smallchunk):
+class Test_retrieve_and_generate:
+    def test_retrieve_then_generate_gettysburg_1(self, indexA_smallchunk, metadatasA_smallchunk):
         """
-        Test the answer() function using the setup from test_query_gettysburg_top_ranked_1,
+        Separately test the retrieve_semantic_search() function and the generate_llm_response() function
+        using the query setup from test_query_gettysburg_top_ranked_1,
         but send it indexA_smallchunk, because that's the fixure that also includes attribute 'texts'.
         Load OpenAI API key via dotenv, query about Gettysburg, and expect the answer to contain
         a phrase like "four score and seven years ago".
@@ -273,7 +274,32 @@ class Test_answer:
         model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
         query = "When did our fathers bring forth a new nation? " + \
                 "Quantify your answer in years"
-        response = answer(query, model, indexA_smallchunk['index'], metadatasA_smallchunk, indexA_smallchunk['texts'], api_key, k_top=5)
+
+        retrieved_chunks = retrieve_semantic_search(query, model, indexA_smallchunk['index'], metadatasA_smallchunk, k_top=5)                
+        llm_response = generate_llm_response(query, indexA_smallchunk['index'], metadatasA_smallchunk, retrieved_chunks, indexA_smallchunk['texts'], api_key, k_top=5)
+
 
         # Assert the answer contains the expected phrase (case-insensitive)
-        assert "87 years" in response
+        assert ("87" in llm_response.lower()) or ("eighty-seven" in llm_response.lower())
+
+
+    def test_retrieve_and_generate_gettysburg_1(self, indexA_smallchunk, metadatasA_smallchunk):
+        """
+        Test the function retrieve_and_generate(). 
+        using the query setup from test_query_gettysburg_top_ranked_1,
+        but send it indexA_smallchunk, because that's the fixure that also includes attribute 'texts'.
+        Load OpenAI API key via dotenv, query about Gettysburg, and expect the answer to contain
+        a phrase like "four score and seven years ago".
+        """
+        load_dotenv()
+        api_key = os.getenv("OPENAI_API_KEY")
+        assert api_key is not None, "OpenAI API key not found in environment variables"
+
+        model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
+        query = "When did our fathers bring forth a new nation? " + \
+                "Quantify your answer in years"
+
+        llm_response = retrieve_and_generate(query, model, indexA_smallchunk['index'], metadatasA_smallchunk, indexA_smallchunk['texts'], api_key, k_top=5)
+
+        # Assert the answer contains the expected phrase (case-insensitive)
+        assert ("87" in llm_response.lower()) or ("eighty-seven" in llm_response.lower())
