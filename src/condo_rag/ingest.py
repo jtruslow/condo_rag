@@ -22,24 +22,36 @@ import pdfplumber
 
 def read_pdf(p: str) -> str:
     """
-    Read text from a PDF file if it is >90% text by page area; otherwise return "TOO_MANY_IMAGES".
+    Read text from a PDF file 
+    If the ratio of text to images is 9/1 by area, then extract the text; otherwise return "TOO_MANY_IMAGES".
 
     Parameters
     - p (str): Path to the PDF file.
 
     Returns
-    - str: Extracted text from the PDF if >90% text, else "TOO_MANY_IMAGES".
+    - str: Extracted text from the PDF
     """
+
+    MAX_ALLOWED_IMAGE_AREA_RATIO = 0.10
+
     with pdfplumber.open(p) as pdf:
         total_text_area = 0.0
+        total_img_area = 0.0
         total_area = 0.0
+        
         for page in pdf.pages:
-            chars = page.chars
-            text_area = sum(c['width'] * c['height'] for c in chars)
+            img_lst = page.images
+            char_lst = page.chars
+            
+            text_area = sum(c['width'] * c['height'] for c in char_lst)
             total_text_area += text_area
+            
+            img_area = sum(img['width'] * img['height'] for img in img_lst)
+            total_img_area += img_area
+            
             total_area += page.width * page.height
         
-        if total_area > 0 and (total_text_area / total_area) > 0.9:
+        if total_area > 0 and (total_img_area / (total_img_area + total_text_area)) < MAX_ALLOWED_IMAGE_AREA_RATIO:
             text = []
             for page in pdf.pages:
                 text.append(page.extract_text() or "")
