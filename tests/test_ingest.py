@@ -125,3 +125,36 @@ class Test_read_pdf:
         """
         extracted_text = read_pdf(doc1_big_image_pdf)
         assert extracted_text.strip() == "TOO_MANY_IMAGES"
+
+class Test_read_txt:
+    def test_doc1_1(self, doc1_text):
+        """
+        Test that read_txt correctly reads text from a temporary text file.
+        Creates a tempfile with the content from doc1_text, calls read_txt,
+        and asserts the output matches doc1_text.
+        """
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tmp_file:
+            tmp_file.write(doc1_text)
+            tmp_file_path = tmp_file.name
+
+        try:
+            result = read_txt(tmp_file_path)
+            assert result == doc1_text
+        finally:
+            os.unlink(tmp_file_path)
+
+    def test_doc2_1(self, doc2_text):
+        """
+        Test that read_txt correctly reads text from a temporary text file.
+        Creates a tempfile with the content from doc2_text, calls read_txt,
+        and asserts the output matches doc2_text.
+        """
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tmp_file:
+            tmp_file.write(doc2_text)
+            tmp_file_path = tmp_file.name
+
+        try:
+            result = read_txt(tmp_file_path)
+            assert result == doc2_text
+        finally:
+            os.unlink(tmp_file_path)
