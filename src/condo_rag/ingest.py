@@ -17,6 +17,61 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import faiss
 from tqdm import tqdm
+import pdfplumber
+
+
+def read_pdf(p: str) -> str:
+    """
+    Read text from a PDF file 
+    If the ratio of text to images is 9/1 by area, then extract the text; otherwise return "TOO_MANY_IMAGES".
+
+    Parameters
+    - p (str): Path to the PDF file.
+
+    Returns
+    - str: Extracted text from the PDF
+    """
+
+    MAX_ALLOWED_IMAGE_AREA_RATIO = 0.10
+
+    with pdfplumber.open(p) as pdf:
+        total_text_area = 0.0
+        total_img_area = 0.0
+        total_area = 0.0
+        
+        for page in pdf.pages:
+            img_lst = page.images
+            char_lst = page.chars
+            
+            text_area = sum(c['width'] * c['height'] for c in char_lst)
+            total_text_area += text_area
+            
+            img_area = sum(img['width'] * img['height'] for img in img_lst)
+            total_img_area += img_area
+            
+            total_area += page.width * page.height
+        
+        if total_area > 0 and (total_img_area / (total_img_area + total_text_area)) < MAX_ALLOWED_IMAGE_AREA_RATIO:
+            text = []
+            for page in pdf.pages:
+                text.append(page.extract_text() or "")
+            return "\n".join(text)
+        else:
+            return "TOO_MANY_IMAGES"
+
+
+def read_txt(p: str) -> str:
+    """
+    Read text from a plain text file.
+
+    Parameters
+    - p (str): Path to the text file.
+
+    Returns
+    - str: Contents of the text file.
+    """
+    with open(p, 'r', encoding='utf-8') as f:
+        return f.read()
 
 
 def load_documents(paths: List[str]) -> List[Dict]:
@@ -25,7 +80,7 @@ def load_documents(paths: List[str]) -> List[Dict]:
 
     Parameters
     - paths (List[str]): A list of filesystem paths to load. Each path may point to a PDF file
-        (ends with .pdf, case-insensitive) or a plain text file.
+        (ends with .pdf, case-insensitive) or a plain text file (ends with .txt, case-insensitive).
 
     Returns
     - docs: A list of dicts, one per successfully read file, each containing:
@@ -33,29 +88,22 @@ def load_documents(paths: List[str]) -> List[Dict]:
         - 'source' (str): the original file path.
 
     Behavior
-    - For PDF files, uses PyPDF2.PdfReader to extract text from each page and joins pages with newlines.
-    - For non-PDF files, opens the file as UTF-8 text and reads its full contents.
+    - For PDF files, uses read_pdf to extract text.
+    - For text files, uses read_txt to read contents.
     - On any read error the function prints an error message and skips that file.
     """
     docs = []
     for p in paths:
-        if p.lower().endswith('.pdf'):
-            try:
-                reader = PdfReader(p)
-                text = []
-                for page in reader.pages:
-                    text.append(page.extract_text() or "")
-                text = "\n".join(text)
-                docs.append({"text": text, "source": p})
-            except Exception as e:
-                print(f"Failed reading PDF {p}: {e}")
-        else:
-            try:
-                with open(p, 'r', encoding='utf-8') as f:
-                    text = f.read()
-                docs.append({"text": text, "source": p})
-            except Exception as e:
-                print(f"Failed reading text {p}: {e}")
+        try:
+            if p.lower().endswith('.pdf'):
+                text = read_pdf(p)
+            elif p.lower().endswith('.txt'):
+                text = read_txt(p)
+            else:
+                raise ValueError(f"Unsupported file type for {p}")
+            docs.append({"text": text, "source": p})
+        except Exception as e:
+            print(f"Failed reading {p}: {e}")
     return docs
 
 
@@ -79,9 +127,9 @@ def build_index(docs: List[Dict], model_name: str = 'sentence-transformers/all-M
     metadatas = []
     for d in docs:
         chunks = chunk_text(d['text'])
-    for i, c in enumerate(chunks):
-        texts.append(c)
-        metadatas.append({"source": d.get('source'), "chunk": i})
+        for i, c in enumerate(chunks):
+            texts.append(c)
+            metadatas.append({"source": d.get('source'), "chunk": i})
     embeddings = model.encode(texts, show_progress_bar=True, convert_to_numpy=True, normalize_embeddings=True)
     dim = embeddings.shape[1]
     index = faiss.IndexFlatIP(dim)
