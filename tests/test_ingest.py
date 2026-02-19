@@ -75,10 +75,10 @@ def doc1_no_image_pdf(doc1_text):
     os.unlink(tmp_file.name)
 
 @pytest.fixture
-def doc1_big_image_pdf():
+def doc1_big_image_pdf(doc1_text):
     """
-    Create a temporary PDF file with a single page containing a centered 6x6 inch blank (white) image.
-    The PDF has a large image area, ensuring it's not >90% text for testing read_pdf logic.
+    Create a temporary PDF file with a single page containing the text from doc1_text and a centered 6x6 inch blank (white) image.
+    The PDF has text and a large image, but since text is added, it should extract the text for testing.
     Yields the file path and deletes the file after the test.
     """
     os.makedirs('tests/data/test_ingest', exist_ok=True)
@@ -93,6 +93,8 @@ def doc1_big_image_pdf():
         with tempfile.NamedTemporaryFile(suffix='.pdf', dir='tests/data/test_ingest', delete=False) as pdf_tmp:
             pdf = FPDF()
             pdf.add_page()
+            pdf.set_font("Arial", size=12)
+            pdf.multi_cell(0, 10, doc1_text)
             # Center the image on A4 page (595x842 points)
             x = (595 - 432) / 2
             y = (842 - 432) / 2
@@ -116,9 +118,10 @@ class Test_read_pdf:
 
     def test_read_pdf_doc1_big_image(self, doc1_big_image_pdf, doc1_text):
         """
-        Test that read_pdf correctly handles a PDF with a large image.
-        The test creates a temporary PDF file containing a large image,
-        then calls read_pdf and asserts that the extracted text indicates too many images.
+        Test that read_pdf correctly extracts text from a PDF with text and a large image.
+        The test creates a temporary PDF file containing the text from doc1_text and a large image,
+        then calls read_pdf and asserts that the extracted text indicates that there were
+        too many images in the PDF for a confident text extraction.
         """
         extracted_text = read_pdf(doc1_big_image_pdf)
         assert extracted_text.strip() == "TOO_MANY_IMAGES"
