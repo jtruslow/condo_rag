@@ -11,6 +11,7 @@ import os
 from dotenv import load_dotenv
 import tempfile
 from fpdf import FPDF
+from PIL import Image
 
 @pytest.fixture
 def doc1_text():
@@ -73,6 +74,36 @@ def doc1_no_image_pdf(doc1_text):
         yield tmp_file.name
     os.unlink(tmp_file.name)
 
+@pytest.fixture
+def doc1_big_image_pdf():
+    """
+    Create a temporary PDF file with a single page containing a centered 6x6 inch blank (white) image.
+    The PDF has a large image area, ensuring it's not >90% text for testing read_pdf logic.
+    Yields the file path and deletes the file after the test.
+    """
+    os.makedirs('tests/data/test_ingest', exist_ok=True)
+    
+    # Create a blank 6x6 inch image (432x432 points at 72 DPI)
+    img_size = (432, 432)
+    img = Image.new('RGB', img_size, color='white')
+    
+    with tempfile.NamedTemporaryFile(suffix='.png', dir='tests/data/test_ingest', delete=False) as img_tmp:
+        img.save(img_tmp.name)
+        
+        with tempfile.NamedTemporaryFile(suffix='.pdf', dir='tests/data/test_ingest', delete=False) as pdf_tmp:
+            pdf = FPDF()
+            pdf.add_page()
+            # Center the image on A4 page (595x842 points)
+            x = (595 - 432) / 2
+            y = (842 - 432) / 2
+            pdf.image(img_tmp.name, x=x, y=y, w=432, h=432)
+            pdf.output(pdf_tmp.name)
+            yield pdf_tmp.name
+        
+        os.unlink(img_tmp.name)
+    
+    os.unlink(pdf_tmp.name)
+
 class Test_read_pdf:
     def test_read_pdf_doc1_no_images(self, doc1_no_image_pdf, doc1_text):
         """
@@ -83,3 +114,11 @@ class Test_read_pdf:
         extracted_text = read_pdf(doc1_no_image_pdf)
         assert extracted_text.strip() == doc1_text.strip()
 
+    def test_read_pdf_doc1_big_image(self, doc1_big_image_pdf, doc1_text):
+        """
+        Test that read_pdf correctly handles a PDF with a large image.
+        The test creates a temporary PDF file containing a large image,
+        then calls read_pdf and asserts that the extracted text indicates too many images.
+        """
+        extracted_text = read_pdf(doc1_big_image_pdf)
+        assert extracted_text.strip() == "TOO_MANY_IMAGES"

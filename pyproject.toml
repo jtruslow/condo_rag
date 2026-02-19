@@ -34,6 +34,8 @@ condo-rag = { workspace = true, editable = true }
 [dependency-groups]
 dev = [
     "condo-rag",
+    "fpdf>=1.7.2",
+    "pdfplumber>=0.11.8",
     "pytest>=8.4.2",
 ]
 
