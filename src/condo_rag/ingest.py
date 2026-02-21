@@ -9,7 +9,7 @@ This module provides:
 
 This is intentionally small and synchronous for clarity.
 """
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Union
 import os
 import io
 from PyPDF2 import PdfReader
@@ -74,13 +74,15 @@ def read_txt(p: str) -> str:
         return f.read()
 
 
-def load_documents(paths: List[str]) -> List[Dict]:
+def load_documents(paths: Union[List[str], str, os.PathLike]) -> List[Dict]:
     """
     Load documents from the given file paths and return a list of document dictionaries.
 
     Parameters
-    - paths (List[str]): A list of filesystem paths to load. Each path may point to a PDF file
-        (ends with .pdf, case-insensitive) or a plain text file (ends with .txt, case-insensitive).
+    - paths (Union[List[str], str, os.PathLike]): Either a list of filesystem paths to load
+        or a single path (string or Path-like) pointing to a single file, 
+        the contents of which are a newline-separated list of paths to the desired content
+        that you want to ingest.
 
     Returns
     - docs: A list of dicts, one per successfully read file, each containing:
@@ -92,6 +94,9 @@ def load_documents(paths: List[str]) -> List[Dict]:
     - For text files, uses read_txt to read contents.
     - On any read error the function prints an error message and skips that file.
     """
+    if isinstance(paths, (str, os.PathLike)):
+        with open(paths, 'r', encoding='utf-8') as f:
+            paths = [line.strip() for line in f if line.strip()]
     docs = []
     for p in paths:
         try:

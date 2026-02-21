@@ -158,3 +158,50 @@ class Test_read_txt:
             assert result == doc2_text
         finally:
             os.unlink(tmp_file_path)
+
+class Test_load_documents:
+    def test_load_documents_from_list_1(self, doc1_text, doc2_text):
+        """
+        Write doc1_text and doc2_text to files inside a temporary directory under tests/,
+        pass their paths to load_documents, and assert the returned documents match.
+        """
+        with tempfile.TemporaryDirectory(dir='tests') as temp_dir:
+            file_paths = []
+            for idx, text in enumerate((doc1_text, doc2_text), start=1):
+                file_path = os.path.join(temp_dir, f'doc{idx}.txt')
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(text)
+                file_paths.append(file_path)
+
+            docs = load_documents(file_paths)
+
+            assert len(docs) == 2
+            assert docs[0]['text'].strip() == doc1_text.strip()
+            assert docs[1]['text'].strip() == doc2_text.strip()
+            assert docs[0]['source'] == file_paths[0]
+            assert docs[1]['source'] == file_paths[1]
+
+    def test_load_documents_from_file_1(self, doc1_text, doc2_text):
+        """
+        Write doc1_text and doc2_text to files and store their paths in list_of_paths.txt,
+        then call load_documents with that file and assert the returned documents match.
+        """
+        with tempfile.TemporaryDirectory(dir='tests') as temp_dir:
+            file_paths = []
+            for idx, text in enumerate((doc1_text, doc2_text), start=1):
+                file_path = os.path.join(temp_dir, f'doc{idx}.txt')
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(text)
+                file_paths.append(file_path)
+
+            list_file = os.path.join(temp_dir, 'list_of_paths.txt')
+            with open(list_file, 'w', encoding='utf-8') as list_fp:
+                list_fp.write("\n".join(file_paths))
+
+            docs = load_documents(list_file)
+
+            assert len(docs) == 2
+            assert docs[0]['text'].strip() == doc1_text.strip()
+            assert docs[1]['text'].strip() == doc2_text.strip()
+            assert docs[0]['source'] == file_paths[0]
+            assert docs[1]['source'] == file_paths[1]
