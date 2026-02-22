@@ -142,7 +142,7 @@ def build_index(docs: List[Dict], model_name: str = 'sentence-transformers/all-M
     return index, metadatas, embeddings, texts
 
 
-def save_index(index, metadatas, path: str):
+def save_index(index, metadatas, texts, path: str):
     os.makedirs(path, exist_ok=True)
     faiss.write_index(index, os.path.join(path, 'index.faiss'))
     import json
