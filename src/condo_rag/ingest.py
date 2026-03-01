@@ -112,7 +112,7 @@ def load_documents(paths: Union[List[str], str, os.PathLike]) -> List[Dict]:
     return docs
 
 
-def chunk_text(text: str, chunk_size: int = 800, overlap: int = 200) -> List[str]:
+def chunk_text(text: str, chunk_size: int = 256, overlap: int = 64) -> List[str]:
     tokens = text.split()
     chunks = []
     start = 0
