@@ -112,7 +112,19 @@ def load_documents(paths: Union[List[str], str, os.PathLike]) -> List[Dict]:
     return docs
 
 
-def chunk_text(text: str, chunk_size: int = 800, overlap: int = 200) -> List[str]:
+def chunk_text(text: str, chunk_size: int = 256, overlap: int = 64) -> List[str]:
+    """Split text into overlapping token chunks for embedding generation.
+
+    Text is tokenized by splitting on whitespace so punctuation stays attached to adjacent words.
+
+    Parameters
+    - text (str): Raw document text to split.
+    - chunk_size (int): Max token count per chunk.
+    - overlap (int): Token overlap between sequential chunks.
+
+    Returns
+    - List[str]: Token chunks preserving context via overlap.
+    """
     tokens = text.split()
     chunks = []
     start = 0
@@ -126,12 +138,31 @@ def chunk_text(text: str, chunk_size: int = 800, overlap: int = 200) -> List[str
     return chunks
 
 
-def build_index(docs: List[Dict], model_name: str = 'sentence-transformers/all-MiniLM-L6-v2') -> Tuple[faiss.IndexFlatIP, List[Dict], np.ndarray]:
+def build_index(
+    docs: List[Dict], 
+    model_name: str = 'sentence-transformers/all-MiniLM-L6-v2',
+    chunk_size: int = 256,
+    overlap: int = 64
+    ) -> Tuple[faiss.IndexFlatIP, List[Dict], np.ndarray]:
+    """Create embeddings from documents and store them in a FAISS index.
+
+    Parameters
+    - docs (List[Dict]): Documents with 'text' and 'source' keys to ingest.
+    - model_name (str): SentenceTransformer checkpoint for embedding generation.
+    - chunk_size (int): Number of tokens per chunk when splitting documents.
+    - overlap (int): Number of tokens to overlap between chunks.
+
+    Returns
+    - index (faiss.IndexFlatIP): FAISS index populated with document embeddings.
+    - metadatas (List[Dict]): Metadata entries parallel to the embeddings.
+    - embeddings (np.ndarray): Numeric vectors used to build the index.
+    - texts (List[str]): Text chunks that correspond to each embedding.
+    """
     model = SentenceTransformer(model_name)
     texts = []
     metadatas = []
     for d in docs:
-        chunks = chunk_text(d['text'])
+        chunks = chunk_text(d['text'], chunk_size=chunk_size, overlap=overlap)
         for i, c in enumerate(chunks):
             texts.append(c)
             metadatas.append({"source": d.get('source'), "chunk": i})
@@ -143,6 +174,15 @@ def build_index(docs: List[Dict], model_name: str = 'sentence-transformers/all-M
 
 
 def save_index(index, metadatas, texts, path: str):
+    """Persist the FAISS index, metadata, and texts to disk.
+
+    Parameters
+    - index: FAISS index produced by build_index.
+    - metadatas (List[Dict]): List of metadata entries, produced by build_index(),
+         matching the saved embeddings.
+    - texts (List[str]): Text chunks corresponding to each embedding. Produced by build_index()
+    - path (str): Directory where index.faiss, metadatas.json, and texts.json are written.
+    """
     os.makedirs(path, exist_ok=True)
     faiss.write_index(index, os.path.join(path, 'index.faiss'))
     import json
@@ -153,6 +193,16 @@ def save_index(index, metadatas, texts, path: str):
 
 
 def load_index(path: str):
+    """Load a previously saved FAISS index along with its metadata and texts.
+
+    Parameters
+    - path (str): Directory where index.faiss, metadatas.json, and texts.json are stored.
+
+    Returns
+    - index: Restored FAISS index instance.
+    - metadatas (List[Dict]): Metadata entries previously saved alongside the index.
+    - texts (List[str]): Text chunks that correspond to each vector in the index.
+    """
     import json
     index = faiss.read_index(os.path.join(path, 'index.faiss'))
     with open(os.path.join(path, 'metadatas.json'), 'r', encoding='utf-8') as f:
