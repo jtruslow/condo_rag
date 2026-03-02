@@ -22,6 +22,8 @@ def cli():
     group.add_argument('--paths', nargs='+', help='Files (PDF or text) to ingest')
     group.add_argument('--pathfile', help='Path to file that contains list of PDF and TXT paths to ingest')
     ingest_p.add_argument('--out', default='data/final/indexdir', help='Output directory for index')
+    ingest_p.add_argument('--chunksize', default=256, help='Tokens per chunk (default: 256)')
+    ingest_p.add_argument('--overlap', default=64, help='Tokens overlap between chunks (default: 64)')
 
     ask = sub.add_parser('ask')
     ask.add_argument('query', help='Question to ask')  # Query to run against the ingested index
