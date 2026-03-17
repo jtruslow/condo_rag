@@ -8,6 +8,14 @@ MODEL_ALL_MINILM_L6_V2_NAME = 'sentence-transformers/all-MiniLM-L6-v2'
 import os
 from dotenv import load_dotenv
 
+# For tests when we want really big chunksizes
+BIGCHUNK_CHUNKSIZE = 1000
+BIGCHUNK_OVERLAP = 200
+
+# For tests when we want really small chunksizes
+SMALLCHUNK_CHUNKSIZE = 20
+SMALLCHUNK_OVERLAP = 0
+
 @pytest.fixture
 def doc1_text():
     doc = """Fourscore and seven years ago our fathers brought forth on this continent 
@@ -63,13 +71,13 @@ def doc2_dct(doc2_text):
     return dct
 
 @pytest.fixture
-def doc1_embeddings(doc1_dct):
+def doc1_embeddings_bigchunk(doc1_dct):
     model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
 
     text_lst = []
     metadata_lst = []
 
-    chunks = chunk_text(doc1_dct['text'])
+    chunks = chunk_text(doc1_dct['text'], chunk_size=BIGCHUNK_CHUNKSIZE, overlap=BIGCHUNK_OVERLAP)
     for i, c in enumerate(chunks):
         text_lst.append(c)
         metadata_lst.append({"source": doc1_dct.get('source'), "chunk": i})
@@ -78,13 +86,13 @@ def doc1_embeddings(doc1_dct):
     return embedding_lst
 
 @pytest.fixture
-def doc2_embeddings(doc2_dct):
+def doc2_embeddings_bigchunk(doc2_dct):
     model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
 
     text_lst = []
     metadata_lst = []
 
-    chunks = chunk_text(doc2_dct['text'])
+    chunks = chunk_text(doc2_dct['text'], chunk_size=BIGCHUNK_CHUNKSIZE, overlap=BIGCHUNK_OVERLAP)
     for i, c in enumerate(chunks):
         text_lst.append(c)
         metadata_lst.append({"source": doc2_dct.get('source'), "chunk": i})
@@ -93,10 +101,10 @@ def doc2_embeddings(doc2_dct):
     return embedding_lst
 
 @pytest.fixture
-def indexA_bigchunk(doc1_embeddings, doc2_embeddings):
+def indexA_bigchunk(doc1_embeddings_bigchunk, doc2_embeddings_bigchunk):
 
     # Stack embeddings from both documents into a single matrix
-    embs = np.vstack([doc1_embeddings, doc2_embeddings])
+    embs = np.vstack([doc1_embeddings_bigchunk, doc2_embeddings_bigchunk])
     # Ensure float32 dtype for faiss
     embs = embs.astype('float32')
     dim = embs.shape[1]
@@ -132,13 +140,11 @@ def metadatasA_bigchunk(doc1_dct, doc2_dct):
     """
     Large chunk size.  Basically will be one chunk per document.
     """
-    CHUNKSIZE = 1000
-    OVERLAP = 200
     metadata_lst = []
-    chunks1 = chunk_text(doc1_dct['text'], chunk_size = CHUNKSIZE, overlap=OVERLAP)
+    chunks1 = chunk_text(doc1_dct['text'], chunk_size = BIGCHUNK_CHUNKSIZE, overlap=BIGCHUNK_OVERLAP)
     for i, c in enumerate(chunks1):
         metadata_lst.append({"source": doc1_dct.get('source'), "chunk": i})
-    chunks2 = chunk_text(doc2_dct['text'], chunk_size = CHUNKSIZE, overlap=OVERLAP)
+    chunks2 = chunk_text(doc2_dct['text'], chunk_size = BIGCHUNK_CHUNKSIZE, overlap=BIGCHUNK_OVERLAP)
     for i, c in enumerate(chunks2):
         metadata_lst.append({"source": doc2_dct.get('source'), "chunk": i})
     return metadata_lst
@@ -148,13 +154,11 @@ def metadatasA_smallchunk(doc1_dct, doc2_dct):
     """
     Small chunk size.  Will be many chunks per document.
     """
-    CHUNKSIZE = 20
-    OVERLAP = 0
     metadata_lst = []
-    chunks1 = chunk_text(doc1_dct['text'], chunk_size = CHUNKSIZE, overlap=OVERLAP)
+    chunks1 = chunk_text(doc1_dct['text'], chunk_size = SMALLCHUNK_CHUNKSIZE, overlap=SMALLCHUNK_OVERLAP)
     for i, c in enumerate(chunks1):
         metadata_lst.append({"source": doc1_dct.get('source'), "chunk": i})
-    chunks2 = chunk_text(doc2_dct['text'], chunk_size = CHUNKSIZE, overlap=OVERLAP)
+    chunks2 = chunk_text(doc2_dct['text'], chunk_size = SMALLCHUNK_CHUNKSIZE, overlap=SMALLCHUNK_OVERLAP)
     for i, c in enumerate(chunks2):
         metadata_lst.append({"source": doc2_dct.get('source'), "chunk": i})
     return metadata_lst
@@ -167,17 +171,17 @@ class Test_trivial:
         assert True
 
 class Test_fixtures:
-    def test_doc1_embeddings_1(self, doc1_embeddings):
+    def test_doc1_embeddings_bigchunk_1(self, doc1_embeddings_bigchunk):
         """
         Expect length should be > 0
         """
-        assert len(doc1_embeddings) > 0
+        assert len(doc1_embeddings_bigchunk) > 0
 
-    def test_doc2_embeddings_1(self, doc2_embeddings):
+    def test_doc2_embeddings_bigchunk_1(self, doc2_embeddings_bigchunk):
         """
         Expect length should be > 0
         """
-        assert len(doc2_embeddings) > 0
+        assert len(doc2_embeddings_bigchunk) > 0
 
     def test_indexA_1(self, indexA_bigchunk):
         """
@@ -196,7 +200,7 @@ class Test_retrieve_semantic_search:
         model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
         query = "when did our fathers bring forth a new nation?"
         results = retrieve_semantic_search(query, model, indexA_bigchunk, metadatasA_bigchunk, k_top=5)
-        # Assert top result corresponds to doc1 (high score for doc1_embeddings)
+        # Assert top result corresponds to doc1 (high score for doc1_embeddings_bigchunk)
         assert results[0]['metadata']['source'] == "doc1_text"
         assert results[1]['metadata']['source'] == "doc2_text"
 
@@ -210,7 +214,7 @@ class Test_retrieve_semantic_search:
         model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
         query = "when did our fathers bring forth a new nation?"
         results = retrieve_semantic_search(query, model, indexA_smallchunk['index'], metadatasA_smallchunk, k_top=5)
-        # Assert top result corresponds to doc1 chunk 0 (high score for doc1_embeddings)
+        # Assert top result corresponds to doc1 chunk 0 (high score for doc1_embeddings_bigchunk)
         assert results[0]['metadata']['chunk'] == 0
 
         # Assert top result corresponds to doc1
@@ -230,7 +234,7 @@ class Test_retrieve_semantic_search:
         model = SentenceTransformer(MODEL_ALL_MINILM_L6_V2_NAME)
         query = "What income does this single man collect each year?"
         results = retrieve_semantic_search(query, model, indexA_bigchunk, metadatasA_bigchunk, k_top=5)
-        # Assert top result corresponds to doc2 (high score for doc2_embeddings)
+        # Assert top result corresponds to doc2 (high score for doc2_embeddings_bigchunk)
         assert results[0]['metadata']['source'] == "doc2_text"
         assert results[1]['metadata']['source'] == "doc1_text"
 
